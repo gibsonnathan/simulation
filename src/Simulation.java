@@ -17,7 +17,7 @@ class Ball{
     int radius;
     Color c;
 
-    public Ball(int x, int y, int vx, int vy, int radius) {
+    private Ball(int x, int y, int vx, int vy, int radius) {
         this.x = x;
         this.y = y;
         this.vx = vx;
@@ -79,8 +79,6 @@ class Ball{
             b.vx -= collisionWeightB * xCollision;
             b.vy -= collisionWeightB * yCollision;
         }
-
-
     }
     /*
         updates the x and y of the ball based on the velocity in the x and y directions, if the ball hits a
@@ -113,8 +111,8 @@ class Ball{
     }
 
     public static Ball randomBallFactory(){
-        return new Ball((int) ((Panel.BORDER_X + Panel.BORDER_WIDTH) / 2),
-                (int) ((Panel.BORDER_Y + Panel.BORDER_HEIGHT) / 2),
+        return new Ball((int) (50 + (int)(Math.random() * 500)),
+                (int)  (50 + (int)(Math.random() * 500)),
                 1 + (int)(Math.random() * 5),
                 1 + (int)(Math.random() * 5),
                 30 + (int)(Math.random() * 50));
@@ -152,7 +150,6 @@ class Panel extends JPanel implements ActionListener{
     private void update(){
         for(Ball b : balls){
             b.update();
-            System.out.println(b);
         }
 
         for(int i = 0; i < balls.size(); i++){
@@ -189,9 +186,10 @@ public class Simulation {
         frame.add(p);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        p.addBall(new Ball(250, 100, 0, 1, 10));
-        p.addBall(new Ball(50, 250, 1, 1, 15));
-        p.addBall(new Ball(20, 200, 1, 2, 20));
+        p.addBall(Ball.randomBallFactory());
+        p.addBall(Ball.randomBallFactory());
+        p.addBall(Ball.randomBallFactory());
+        p.addBall(Ball.randomBallFactory());
     }
 }
 
