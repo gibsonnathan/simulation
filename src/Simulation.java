@@ -15,14 +15,20 @@ class Ball{
     int vx;
     int vy;
     int radius;
+    int center_x;
+    int center_y;
     Color c;
-
+    /*
+        private constructor, ball factory method is used for instantiation
+    */
     private Ball(int x, int y, int vx, int vy, int radius) {
         this.x = x;
         this.y = y;
         this.vx = vx;
         this.vy = vy;
         this.radius = radius;
+        this.center_x = x + radius;
+        this.center_y = y + radius;
         c = new Color((int)(Math.random()*256), (int)(Math.random()*256), (int)(Math.random()*256));
     }
     /*
@@ -31,8 +37,8 @@ class Ball{
         checks to see if a Ball b is colliding with this ball; returns true if it is and false otherwise
     */
     public boolean isColliding(Ball b){
-        float xd = x - b.x;
-        float yd = y - b.y;
+        float xd = center_x - b.center_x;
+        float yd = center_y - b.center_y;
         float sumRadius = radius + b.radius;
         float sqrRadius = sumRadius * sumRadius;
         float distSqr = (xd * xd) + (yd * yd);
@@ -64,13 +70,10 @@ class Ball{
         double xVelocity = b.vx - vx;
         double yVelocity = b.vy - vy;
         double dotProduct = xDist*xVelocity + yDist*yVelocity;
-        //Neat vector maths, used for checking if the objects moves towards one another.
         if(dotProduct > 0){
             double collisionScale = dotProduct / distSquared;
             double xCollision = xDist * collisionScale;
             double yCollision = yDist * collisionScale;
-            //The Collision vector is the speed difference projected on the Dist vector,
-            //thus it is the component of the speed difference needed for the collision.
             double combinedMass = radius + b.radius;
             double collisionWeightA = 2 * b.radius / combinedMass;
             double collisionWeightB = 2 * radius / combinedMass;
@@ -87,6 +90,8 @@ class Ball{
     public void update(){
         x += vx;
         y += vy;
+        center_x = x + radius;
+        center_y = y + radius;
 
         //ball has hit the right side of border
         if(x + 2 * radius >= Panel.BORDER_WIDTH + Panel.BORDER_X){
@@ -109,6 +114,9 @@ class Ball{
             y = Panel.BORDER_Y + 1;
         }
     }
+    /*
+        acts as a factory for creating ball instances
+     */
 
     public static Ball randomBallFactory(){
         return new Ball((int) (50 + (int)(Math.random() * 500)),
