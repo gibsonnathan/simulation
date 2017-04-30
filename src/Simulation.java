@@ -1,14 +1,27 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
-import java.awt.event.*;
+import java.util.Random;
 /*
     class that represents the state of a ball in this simulation
 
     in this class I am assuming that the mass of the ball grows proportional
     to the radius of the ball
  */
-class Ball{
+class Ball implements Serializable{
+
+    public static final int MIN_INITIAL_SPEED = 1;
+    public static final int MAX_INITIAL_SPEED = 10;
+    public static final int MAX_RADIUS = 30;
+    public static final int MIN_RADIUS = 15;
 
     int x;
     int y;
@@ -19,9 +32,9 @@ class Ball{
     int center_y;
     Color c;
     /*
-        private constructor, ball factory method is used for instantiation
+        default constructor for a ball object
     */
-    private Ball(int x, int y, int vx, int vy, int radius) {
+    public Ball(int x, int y, int vx, int vy, int radius) {
         this.x = x;
         this.y = y;
         this.vx = vx;
@@ -32,8 +45,19 @@ class Ball{
         c = new Color((int)(Math.random()*256), (int)(Math.random()*256), (int)(Math.random()*256));
     }
     /*
+        chaining constructor for ball object with a random radius
+     */
+    public Ball(int x, int y, int vx, int vy) {
+        this(x, y, vx, vy, MIN_RADIUS + (int)(Math.random() * MAX_RADIUS));
+    }
+    /*
+        chaining constructor for a ball object with only x and y location provided
+     */
+    public Ball(int x, int y) {
+        this(x, y, MIN_INITIAL_SPEED + (int)(Math.random() * MAX_INITIAL_SPEED), MIN_INITIAL_SPEED + (int)(Math.random() * MAX_INITIAL_SPEED));
+    }
+    /*
         logic adapted from: http://stackoverflow.com/questions/345838/ball-to-ball-collision-detection-and-handling
-
         checks to see if a Ball b is colliding with this ball; returns true if it is and false otherwise
     */
     public boolean isColliding(Ball b){
@@ -94,70 +118,89 @@ class Ball{
         center_y = y + radius;
 
         //ball has hit the right side of border
-        if(x + 2 * radius >= Panel.BORDER_WIDTH + Panel.BORDER_X){
+        if(x + 2 * radius >= ServerPanel.BORDER_WIDTH + ServerPanel.BORDER_X){
             vx = -vx;
-            x = (Panel.BORDER_WIDTH + Panel.BORDER_X) - (2 * radius) - 1;
+            x = (SimulationPanel.BORDER_WIDTH + SimulationPanel.BORDER_X) - (2 * radius) - 1;
         }
         //ball has hit the left side of border
-        if(x  <= Panel.BORDER_X){
+        if(x  <= SimulationPanel.BORDER_X){
             vx = Math.abs(vx);
-            x = Panel.BORDER_X + 1;
+            x = SimulationPanel.BORDER_X + 1;
         }
         //ball has hit the bottom of border
-        if(y + 2 * radius >= Panel.BORDER_HEIGHT+ Panel.BORDER_Y){
+        if(y + 2 * radius >= SimulationPanel.BORDER_HEIGHT+ SimulationPanel.BORDER_Y){
             vy = -vy;
-            y = (Panel.BORDER_HEIGHT + Panel.BORDER_Y) - (2 * radius) - 1;
+            y = (SimulationPanel.BORDER_HEIGHT + SimulationPanel.BORDER_Y) - (2 * radius) - 1;
         }
         //ball has hit the top of border
-        if(y  <= Panel.BORDER_Y){
+        if(y  <= SimulationPanel.BORDER_Y){
             vy = Math.abs(vy);
-            y = Panel.BORDER_Y + 1;
+            y = SimulationPanel.BORDER_Y + 1;
         }
-    }
-    /*
-        acts as a factory for creating ball instances
-     */
-
-    public static Ball randomBallFactory(){
-        return new Ball((int) (50 + (int)(Math.random() * 500)),
-                (int)  (50 + (int)(Math.random() * 500)),
-                1 + (int)(Math.random() * 5),
-                1 + (int)(Math.random() * 5),
-                30 + (int)(Math.random() * 50));
     }
     /*
         string representation of a ball object
      */
     public String toString(){
-        return "x: " + x + " y: " + y + " vx: " + vx + " vy: " + vy;
+        return "center_x: " + center_x + " center_y: " + center_y + " vx: " + vx + " vy: " + vy;
     }
 
 }
-
-class Panel extends JPanel implements ActionListener{
-
+/*
+    superclass for panels used by the server and client
+*/
+class SimulationPanel extends JPanel{
     public static final int BORDER_HEIGHT = 500;
     public static final int BORDER_WIDTH = 500;
     public static final int BORDER_X = 100;
     public static final int BORDER_Y = 100;
     public static final int DELAY = 10;
-
+}
+/*
+    Panel that is displayed on the server
+ */
+class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
     private ArrayList<Ball> balls;
     javax.swing.Timer timer;
-
-    public Panel(){
+    Random r;
+    ServerSocket serverSocket;
+    ArrayList<Socket> clients;
+    /*
+        sets up the ball objects in the simulation and created a timer that determines how frequently the
+        simulation updates
+     */
+    public ServerPanel(){
         balls = new ArrayList<Ball>();
         timer=new Timer(DELAY, this);
         timer.start();
+        r = new Random();
+        serverSocket = null;
+        clients = new ArrayList<Socket>();
     }
-
+    /*
+        adds a ball object to the simulation
+     */
     public void addBall(Ball b){
         balls.add(b);
     }
-
+    /*
+        updates each of the balls locations, checks to see if they are colliding with another ball,
+        if so the collision is handled by the collide method
+     */
     private void update(){
+        ObjectOutputStream out = null;
+
         for(Ball b : balls){
             b.update();
+        }
+
+        for(Socket s : clients){
+            try {
+                out = new ObjectOutputStream(s.getOutputStream());
+                out.writeObject(balls);
+            }catch(IOException e){
+                e.printStackTrace();
+            }
         }
 
         for(int i = 0; i < balls.size(); i++){
@@ -168,36 +211,203 @@ class Panel extends JPanel implements ActionListener{
             }
         }
     }
-
+    /*
+        takes the first ball in the ball object list and gives it a random x and y velocity
+     */
+    public void shootBallOne(){
+        if(balls.size() >= 1) {
+            balls.get(0).vx = r.nextInt(5 + 1 + 5) - 5;
+            balls.get(0).vy = r.nextInt(5 + 1 + 5) - 5;
+        }
+    }
+    /*
+        takes the second ball in the ball object list and gives it a random x and y velocity
+     */
+    public void shootBallTwo(){
+        if(balls.size() >= 2) {
+            balls.get(1).vx = r.nextInt(5 + 1 + 5) - 5;
+            balls.get(1).vy = r.nextInt(5 + 1 + 5) - 5;
+        }
+    }
+    /*
+        listener to respond to the timer
+     */
     public void actionPerformed(ActionEvent ev) {
         if (ev.getSource() == timer) {
             update();
             repaint();
         }
     }
-
+    /*
+        paints each of the balls in the ball object list to the screen
+     */
     public void paint(Graphics g) {
             g.drawRect(BORDER_X, BORDER_Y, BORDER_WIDTH, BORDER_HEIGHT);
             for(Ball b : balls){
                 b.draw(g);
             }
     }
-}
 
+    public void run() {
+        try {
+            serverSocket = new ServerSocket(5003);
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+
+        int id = 0;
+        while (true) {
+            try {
+                Socket clientSocket = serverSocket.accept();
+                clients.add(clientSocket);
+            }catch(IOException e){
+                e.printStackTrace();
+                System.err.println("Error while accepting a client connection!");
+            }
+        }
+    }
+}
+/*
+    panel that is used for displaying the simulation in the client
+ */
+class ClientPanel extends SimulationPanel implements Runnable{
+    javax.swing.Timer timer;
+    Socket socket;
+    ObjectOutputStream out;
+    ObjectInputStream in;
+    ArrayList<Ball> balls;
+
+    public ClientPanel(){
+        //timer=new Timer(SimulationPanel.DELAY, this);
+        //timer.start();
+        socket = null;
+        out = null;
+        in = null;
+        balls = null;
+
+    }
+    /*
+        listener to respond to the timer
+     */
+    //public void actionPerformed(ActionEvent ev) {
+    //    if (ev.getSource() == timer) {
+    //        repaint();
+    //    }
+    //}
+
+    public void paint(Graphics g) {
+        g.drawRect(BORDER_X, BORDER_Y, BORDER_WIDTH, BORDER_HEIGHT);
+        for(Ball b : balls){
+            b.draw(g);
+        }
+
+    }
+
+    public void run(){
+        try {
+            socket = new Socket("127.0.0.1", 5003);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        while(true){
+            try {
+                in = new ObjectInputStream(socket.getInputStream());
+                balls = (ArrayList<Ball>) in.readObject();
+                repaint();
+            }catch(ClassNotFoundException e){
+                e.printStackTrace();
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        }
+    }
+}
+/*
+    constructs the GUI, listens for network connections, listens for button events
+ */
 public class Simulation {
 
     public static void main(String[] args) {
-
-        JFrame frame = new JFrame();
+        final JFrame frame = new JFrame();
+        final ServerPanel p = new ServerPanel();
         frame.setSize(700, 700);
-        Panel p = new Panel();
+        frame.setTitle("Physics Simulation");
+
+
+        JPanel buttonPanel = new JPanel();
+        final JButton startServerButton = new JButton("Start Network Server");
+        JButton startClientButton = new JButton("Start Network Client");
+        JButton stopButton = new JButton("Stop");
+        JButton shootBallOne = new JButton("Shoot Ball 1");
+        JButton shootBallTwo = new JButton("Shoot Ball 2");
+
+
+        p.addBall(new Ball(200,200));
+        p.addBall(new Ball(200,200));
+        p.addBall(new Ball(200,200));
+        p.addBall(new Ball(200,200));
+        p.addBall(new Ball(200,200));
+
+        shootBallOne.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                p.shootBallOne();
+            }
+        });
+
+        shootBallTwo.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                p.shootBallTwo();
+            }
+        });
+
+        startClientButton.addActionListener(new ActionListener()
+        {
+            public void actionPerformed(ActionEvent e) {
+                JFrame clientFrame = new JFrame();
+                ClientPanel clientPanel = new ClientPanel();
+                clientFrame.add(clientPanel);
+                clientFrame.setSize(700, 700);
+                clientFrame.setTitle("Client");
+                clientFrame.setVisible(true);
+                Thread clientThread = new Thread(clientPanel);
+                clientThread.start();
+            }
+        });
+
+        startServerButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Thread serverThread = new Thread(p);
+                serverThread.start();
+                startServerButton.removeActionListener(this);
+            }
+        });
+
+        stopButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.exit(0);
+            }
+        });
+
+        buttonPanel.add(startServerButton);
+        buttonPanel.add(startClientButton);
+        buttonPanel.add(stopButton);
+        buttonPanel.add(shootBallOne);
+        buttonPanel.add(shootBallTwo);
+
         frame.add(p);
+        frame.add(buttonPanel, BorderLayout.NORTH);
+
+
         frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        p.addBall(Ball.randomBallFactory());
-        p.addBall(Ball.randomBallFactory());
-        p.addBall(Ball.randomBallFactory());
-        p.addBall(Ball.randomBallFactory());
+
+
+
     }
 }
 
