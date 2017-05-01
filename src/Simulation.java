@@ -1,3 +1,11 @@
+/*
+    Nathan Gibson
+    May 1, 2017
+
+    to run this program:
+    javac Simulation.java
+    java Simulation
+*/
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -18,7 +26,7 @@ import java.util.Random;
  */
 class Ball implements Serializable{
 
-    public static final int MIN_INITIAL_SPEED = 1;
+    public static final int MIN_INITIAL_SPEED = -10;
     public static final int MAX_INITIAL_SPEED = 10;
     public static final int MAX_RADIUS = 30;
     public static final int MIN_RADIUS = 15;
@@ -112,10 +120,14 @@ class Ball implements Serializable{
         border it is reflected off
     */
     public void update(){
+        //update ball's position
         x += vx;
         y += vy;
         center_x = x + radius;
         center_y = y + radius;
+
+        //in each of the following calculations I have to account for the x and y of
+        //the ball being at the top left
 
         //ball has hit the right side of border
         if(x + 2 * radius >= ServerPanel.BORDER_WIDTH + ServerPanel.BORDER_X){
@@ -144,12 +156,11 @@ class Ball implements Serializable{
     public String toString(){
         return "center_x: " + center_x + " center_y: " + center_y + " vx: " + vx + " vy: " + vy;
     }
-
 }
 /*
     superclass for panels used by the server and client
 */
-class SimulationPanel extends JPanel{
+abstract class SimulationPanel extends JPanel{
     public static final int BORDER_HEIGHT = 500;
     public static final int BORDER_WIDTH = 500;
     public static final int BORDER_X = 100;
@@ -191,12 +202,12 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
         ObjectOutputStream out = null;
         ObjectInputStream in = null;
 
-
-
+        //update each balls location
         for(Ball b : balls){
             b.update();
         }
 
+        //write out each of the updated balls to the clients
         for(Socket s : clients){
             try {
                 out = new ObjectOutputStream(s.getOutputStream());
@@ -206,6 +217,7 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
             }
         }
 
+        //check to see if there are collisions
         for(int i = 0; i < balls.size(); i++){
             for(int j = i + 1; j < balls.size(); j++){
                 if(balls.get(i).isColliding(balls.get(j))){
@@ -219,8 +231,8 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
      */
     public void shootBallOne(){
         if(balls.size() >= 1) {
-            balls.get(0).vx = r.nextInt(5 + 1 + 5) - 5;
-            balls.get(0).vy = r.nextInt(5 + 1 + 5) - 5;
+            balls.get(0).vx = r.nextInt(Ball.MAX_INITIAL_SPEED - Ball.MIN_INITIAL_SPEED + 1) + Ball.MIN_INITIAL_SPEED;
+            balls.get(0).vy = r.nextInt(Ball.MAX_INITIAL_SPEED - Ball.MIN_INITIAL_SPEED + 1) + Ball.MIN_INITIAL_SPEED;
         }
     }
     /*
@@ -250,22 +262,22 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
                 b.draw(g);
             }
     }
-
+    /*
+        server thread that runs and listens for client connections
+    */
     public void run() {
         try {
-            serverSocket = new ServerSocket(5003);
+            serverSocket = new ServerSocket(Simulation.SERVER_PORT);
         }catch (IOException e){
             e.printStackTrace();
         }
 
-        int id = 0;
         while (true) {
             try {
                 Socket clientSocket = serverSocket.accept();
                 clients.add(clientSocket);
             }catch(IOException e){
                 e.printStackTrace();
-                System.err.println("Error while accepting a client connection!");
             }
         }
     }
@@ -274,22 +286,22 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
     panel that is used for displaying the simulation in the client
  */
 class ClientPanel extends SimulationPanel implements Runnable{
-    javax.swing.Timer timer;
     Socket socket;
     ObjectOutputStream out;
     ObjectInputStream in;
     ArrayList<Ball> balls;
-
+    /*
+        ClientPanel constructor sets up networking
+    */
     public ClientPanel(){
-        //timer=new Timer(SimulationPanel.DELAY, this);
-        //timer.start();
         socket = null;
         out = null;
         in = null;
         balls = null;
-
     }
-
+    /*
+        paints the border and each ball object to the client panel
+    */
     public void paint(Graphics g) {
         g.drawRect(BORDER_X, BORDER_Y, BORDER_WIDTH, BORDER_HEIGHT);
         if (balls != null) {
@@ -298,14 +310,16 @@ class ClientPanel extends SimulationPanel implements Runnable{
             }
         }
     }
-
+    /*
+        thread connects to the server and receives updates on each update containing
+        a list of ball objects
+    */
     public void run(){
         try {
-            socket = new Socket("127.0.0.1", 5003);
+            socket = new Socket(Simulation.SERVER_IP_ADDRESS, Simulation.SERVER_PORT);
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         while(true){
             try {
                 in = new ObjectInputStream(socket.getInputStream());
@@ -326,50 +340,64 @@ public class Simulation {
 
     public static final int FRAME_HEIGHT = 700;
     public static final int FRAME_WIDTH = 900;
+    public static final String SERVER_TITLE = "Simulation Server";
+    public static final int MASS_FIELD_LENGTH = 3;
+    public static final int MINIMUM_BALL_MASS = 15;
+    public static final int MAXIMUM_BALL_MASS = 30;
+    public static final String SERVER_IP_ADDRESS = "127.0.0.1";
+    public static final int SERVER_PORT = 2345;
 
     public static void main(String[] args) {
         final JFrame frame = new JFrame();
         final ServerPanel p = new ServerPanel();
         frame.setSize(FRAME_WIDTH, FRAME_HEIGHT);
-        frame.setTitle("Physics Simulation");
+        frame.setTitle(SERVER_TITLE);
 
-
-        JPanel buttonPanel = new JPanel();
+        final JPanel buttonPanel = new JPanel();
         final JButton startServerButton = new JButton("Start Network Server");
-        JButton startClientButton = new JButton("Start Network Client");
-        JButton stopButton = new JButton("Stop");
-        JButton shootBallOne = new JButton("Shoot Ball 1");
-        JButton shootBallTwo = new JButton("Shoot Ball 2");
-        JButton addBallButton = new JButton("Add a ball");
-        final JTextField massField = new JTextField("mass", 4);
+        final JButton startClientButton = new JButton("Start Network Client");
+        final JButton stopButton = new JButton("Stop");
+        final JButton shootBallOne = new JButton("Shoot Ball 1");
+        final JButton shootBallTwo = new JButton("Shoot Ball 2");
+        final JButton addBallButton = new JButton("Add a ball");
+        final JTextField massField = new JTextField("mass", MASS_FIELD_LENGTH);
 
+        //initally set the start client to disabled so that the user first has
+        //to start the Server
+        startClientButton.setEnabled(false);
 
+        //add initial balls to the simulation
         p.addBall(new Ball(200,200));
         p.addBall(new Ball(200,200));
 
-
+        /*
+            user clicks the shoot ball 1 button
+        */
         shootBallOne.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 p.shootBallOne();
             }
         });
-
+        /*
+            user clicks the shoot ball 2 button
+        */
         shootBallTwo.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 p.shootBallTwo();
             }
         });
-
+        /*
+            user hits the start client button
+        */
         startClientButton.addActionListener(new ActionListener()
         {
             public void actionPerformed(ActionEvent e) {
-                JFrame clientFrame = new JFrame();
-
-                JPanel buttonPanel = new JPanel();
-                JButton addBallButton = new JButton("Add a ball");
-                final JTextField massField = new JTextField("mass", 3);
+                final JFrame clientFrame = new JFrame();
+                final JPanel buttonPanel = new JPanel();
+                final JButton addBallButton = new JButton("Add a ball");
+                final JTextField massField = new JTextField("mass", MASS_FIELD_LENGTH);
                 buttonPanel.add(addBallButton);
                 buttonPanel.add(massField);
 
@@ -379,16 +407,22 @@ public class Simulation {
                 clientFrame.setSize(FRAME_WIDTH, FRAME_HEIGHT);
                 clientFrame.setTitle("Client");
 
+                /*
+                    user clicked the add ball button on the client frame,
+                    we have to get the desired mass from the massField text box
+                    and send a message to the server telling it to add a ball
+                    of desired mass
+                */
                 addBallButton.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         try{
                             Integer mass = Integer.parseInt(massField.getText());
-                            if(mass < 15 || mass > 30){
+                            if(mass < MINIMUM_BALL_MASS || mass > MAXIMUM_BALL_MASS){
                                 throw new NumberFormatException();
                             }
                             try {
-                                Socket s = new Socket("127.0.0.1", 5003);
+                                Socket s = new Socket(SERVER_IP_ADDRESS, SERVER_PORT);
                                 ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
                                 out.writeObject(mass);
                             }catch(IOException x){
@@ -405,29 +439,38 @@ public class Simulation {
                 clientFrame.setVisible(true);
             }
         });
-
+        /*
+            user clicks the start server button on the server frame, this
+            enables the start client button and disables the start network button
+            so that the user cannot attempt to create another server
+        */
         startServerButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 Thread serverThread = new Thread(p);
                 serverThread.start();
-                startServerButton.removeActionListener(this);
+                startServerButton.setEnabled(false);
+                startClientButton.setEnabled(true);
             }
         });
-
+        /*
+            user clicks the stop button on the server frame
+        */
         stopButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 System.exit(0);
             }
         });
-
+        /*
+            user clicks the add ball button on the server frame
+        */
         addBallButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try{
                     int mass = Integer.parseInt(massField.getText());
-                    if(mass < 15 || mass > 30){
+                    if(mass < MINIMUM_BALL_MASS || mass > MAXIMUM_BALL_MASS){
                         throw new NumberFormatException();
                     }
                     p.addBall(new Ball(200, 200, 2, 2, mass));
@@ -437,6 +480,7 @@ public class Simulation {
             }
         });
 
+        //add buttons to panels and panels to the frame
         buttonPanel.add(startServerButton);
         buttonPanel.add(startClientButton);
         buttonPanel.add(stopButton);
@@ -444,15 +488,9 @@ public class Simulation {
         buttonPanel.add(shootBallTwo);
         buttonPanel.add(addBallButton);
         buttonPanel.add(massField);
-
         frame.add(p);
         frame.add(buttonPanel, BorderLayout.NORTH);
-
-        frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-
-
+        frame.setVisible(true);
     }
 }
-
