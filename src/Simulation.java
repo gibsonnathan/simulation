@@ -25,12 +25,6 @@ import java.util.Random;
     to the radius of the ball
  */
 class Ball implements Serializable{
-
-    public static final int MIN_INITIAL_SPEED = -10;
-    public static final int MAX_INITIAL_SPEED = 10;
-    public static final int MAX_RADIUS = 30;
-    public static final int MIN_RADIUS = 15;
-
     int x;
     int y;
     int vx;
@@ -56,13 +50,13 @@ class Ball implements Serializable{
         chaining constructor for ball object with a random radius
      */
     public Ball(int x, int y, int vx, int vy) {
-        this(x, y, vx, vy, MIN_RADIUS + (int)(Math.random() * MAX_RADIUS));
+        this(x, y, vx, vy, Simulation.MINIMUM_BALL_MASS + (int)(Math.random() * Simulation.MAXIMUM_BALL_MASS));
     }
     /*
         chaining constructor for a ball object with only x and y location provided
      */
     public Ball(int x, int y) {
-        this(x, y, MIN_INITIAL_SPEED + (int)(Math.random() * MAX_INITIAL_SPEED), MIN_INITIAL_SPEED + (int)(Math.random() * MAX_INITIAL_SPEED));
+        this(x, y, new Random().nextInt(Simulation.MAX_INITIAL_SPEED - Simulation.MIN_INITIAL_SPEED + 1) + Simulation.MIN_INITIAL_SPEED, new Random().nextInt(Simulation.MAX_INITIAL_SPEED - Simulation.MIN_INITIAL_SPEED + 1) + Simulation.MIN_INITIAL_SPEED);
     }
     /*
         logic adapted from: http://stackoverflow.com/questions/345838/ball-to-ball-collision-detection-and-handling
@@ -231,8 +225,8 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
      */
     public void shootBallOne(){
         if(balls.size() >= 1) {
-            balls.get(0).vx = r.nextInt(Ball.MAX_INITIAL_SPEED - Ball.MIN_INITIAL_SPEED + 1) + Ball.MIN_INITIAL_SPEED;
-            balls.get(0).vy = r.nextInt(Ball.MAX_INITIAL_SPEED - Ball.MIN_INITIAL_SPEED + 1) + Ball.MIN_INITIAL_SPEED;
+            balls.get(0).vx = r.nextInt(Simulation.MAX_INITIAL_SPEED - Simulation.MIN_INITIAL_SPEED + 1) + Simulation.MIN_INITIAL_SPEED;
+            balls.get(0).vy = r.nextInt(Simulation.MAX_INITIAL_SPEED - Simulation.MIN_INITIAL_SPEED + 1) + Simulation.MIN_INITIAL_SPEED;
         }
     }
     /*
@@ -240,8 +234,8 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
      */
     public void shootBallTwo(){
         if(balls.size() >= 2) {
-            balls.get(1).vx = r.nextInt(5 + 1 + 5) - 5;
-            balls.get(1).vy = r.nextInt(5 + 1 + 5) - 5;
+            balls.get(1).vx = r.nextInt(Simulation.MAX_INITIAL_SPEED - Simulation.MIN_INITIAL_SPEED + 1) + Simulation.MIN_INITIAL_SPEED;
+            balls.get(1).vy = r.nextInt(Simulation.MAX_INITIAL_SPEED - Simulation.MIN_INITIAL_SPEED + 1) + Simulation.MIN_INITIAL_SPEED;
         }
     }
     /*
@@ -337,13 +331,14 @@ class ClientPanel extends SimulationPanel implements Runnable{
     constructs the GUI, listens for network connections, listens for button events
  */
 public class Simulation {
-
     public static final int FRAME_HEIGHT = 700;
     public static final int FRAME_WIDTH = 900;
     public static final String SERVER_TITLE = "Simulation Server";
     public static final int MASS_FIELD_LENGTH = 3;
-    public static final int MINIMUM_BALL_MASS = 15;
-    public static final int MAXIMUM_BALL_MASS = 30;
+    public static final int MINIMUM_BALL_MASS = 20;
+    public static final int MAXIMUM_BALL_MASS = 50;
+    public static final int MIN_INITIAL_SPEED = -10;
+    public static final int MAX_INITIAL_SPEED = 10;
     public static final String SERVER_IP_ADDRESS = "127.0.0.1";
     public static final int SERVER_PORT = 2345;
 
@@ -429,7 +424,7 @@ public class Simulation {
                                 x.printStackTrace();
                             }
                         }catch(NumberFormatException x){
-                            JOptionPane.showMessageDialog(frame, "Mass field should be an integer 15 <= x <= 30");
+                            JOptionPane.showMessageDialog(frame, "Mass field should be an integer " + MINIMUM_BALL_MASS + " <= x <= " + MAXIMUM_BALL_MASS);
                         }
                     }
                 });
@@ -475,7 +470,7 @@ public class Simulation {
                     }
                     p.addBall(new Ball(200, 200, 2, 2, mass));
                 }catch(NumberFormatException x){
-                    JOptionPane.showMessageDialog(frame, "Mass field should be an integer 15 <= x <= 30");
+                    JOptionPane.showMessageDialog(frame, "Mass field should be an integer " + MINIMUM_BALL_MASS + " <= x <= " + MAXIMUM_BALL_MASS);
                 }
             }
         });
