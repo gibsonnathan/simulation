@@ -337,8 +337,8 @@ public class Simulation {
     public static final int MASS_FIELD_LENGTH = 3;
     public static final int MINIMUM_BALL_MASS = 20;
     public static final int MAXIMUM_BALL_MASS = 50;
-    public static final int MIN_INITIAL_SPEED = -10;
-    public static final int MAX_INITIAL_SPEED = 10;
+    public static final int MIN_INITIAL_SPEED = -5;
+    public static final int MAX_INITIAL_SPEED = 5;
     public static final String SERVER_IP_ADDRESS = "127.0.0.1";
     public static final int SERVER_PORT = 2345;
 
