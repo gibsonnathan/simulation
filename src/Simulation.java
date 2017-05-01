@@ -29,25 +29,25 @@ class Ball implements Serializable{
     int y;
     int vx;
     int vy;
-    int radius;
+    int mass;
     int center_x;
     int center_y;
     Color c;
     /*
         default constructor for a ball object
     */
-    public Ball(int x, int y, int vx, int vy, int radius) {
+    public Ball(int x, int y, int vx, int vy, int mass) {
         this.x = x;
         this.y = y;
         this.vx = vx;
         this.vy = vy;
-        this.radius = radius;
-        this.center_x = x + radius;
-        this.center_y = y + radius;
+        this.mass = mass;
+        this.center_x = x + mass;
+        this.center_y = y + mass;
         c = new Color((int)(Math.random()*256), (int)(Math.random()*256), (int)(Math.random()*256));
     }
     /*
-        chaining constructor for ball object with a random radius
+        chaining constructor for ball object with a random mass
      */
     public Ball(int x, int y, int vx, int vy) {
         this(x, y, vx, vy, Simulation.MINIMUM_BALL_MASS + (int)(Math.random() * Simulation.MAXIMUM_BALL_MASS));
@@ -65,7 +65,7 @@ class Ball implements Serializable{
     public boolean isColliding(Ball b){
         float xd = center_x - b.center_x;
         float yd = center_y - b.center_y;
-        float sumRadius = radius + b.radius;
+        float sumRadius = mass + b.mass;
         float sqrRadius = sumRadius * sumRadius;
         float distSqr = (xd * xd) + (yd * yd);
 
@@ -79,9 +79,9 @@ class Ball implements Serializable{
         draws the ball to the screen at its current location and fills it with color
      */
     public void draw(Graphics g){
-        g.drawOval(x, y, 2 * radius, 2 * radius);
+        g.drawOval(x, y, 2 * mass, 2 * mass);
         g.setColor(c);
-        g.fillOval(x, y, 2 * radius, 2 * radius);
+        g.fillOval(x, y, 2 * mass, 2 * mass);
     }
     /*
         changes the vx and vy of both balls involved in a collision
@@ -100,9 +100,9 @@ class Ball implements Serializable{
             double collisionScale = dotProduct / distSquared;
             double xCollision = xDist * collisionScale;
             double yCollision = yDist * collisionScale;
-            double combinedMass = radius + b.radius;
-            double collisionWeightA = 2 * b.radius / combinedMass;
-            double collisionWeightB = 2 * radius / combinedMass;
+            double combinedMass = mass + b.mass;
+            double collisionWeightA = 2 * b.mass / combinedMass;
+            double collisionWeightB = 2 * mass / combinedMass;
             vx += collisionWeightA * xCollision;
             vy += collisionWeightA * yCollision;
             b.vx -= collisionWeightB * xCollision;
@@ -117,16 +117,16 @@ class Ball implements Serializable{
         //update ball's position
         x += vx;
         y += vy;
-        center_x = x + radius;
-        center_y = y + radius;
+        center_x = x + mass;
+        center_y = y + mass;
 
         //in each of the following calculations I have to account for the x and y of
         //the ball being at the top left
 
         //ball has hit the right side of border
-        if(x + 2 * radius >= ServerPanel.BORDER_WIDTH + ServerPanel.BORDER_X){
+        if(x + 2 * mass >= ServerPanel.BORDER_WIDTH + ServerPanel.BORDER_X){
             vx = -vx;
-            x = (SimulationPanel.BORDER_WIDTH + SimulationPanel.BORDER_X) - (2 * radius) - 1;
+            x = (SimulationPanel.BORDER_WIDTH + SimulationPanel.BORDER_X) - (2 * mass) - 1;
         }
         //ball has hit the left side of border
         if(x  <= SimulationPanel.BORDER_X){
@@ -134,9 +134,9 @@ class Ball implements Serializable{
             x = SimulationPanel.BORDER_X + 1;
         }
         //ball has hit the bottom of border
-        if(y + 2 * radius >= SimulationPanel.BORDER_HEIGHT+ SimulationPanel.BORDER_Y){
+        if(y + 2 * mass >= SimulationPanel.BORDER_HEIGHT+ SimulationPanel.BORDER_Y){
             vy = -vy;
-            y = (SimulationPanel.BORDER_HEIGHT + SimulationPanel.BORDER_Y) - (2 * radius) - 1;
+            y = (SimulationPanel.BORDER_HEIGHT + SimulationPanel.BORDER_Y) - (2 * mass) - 1;
         }
         //ball has hit the top of border
         if(y  <= SimulationPanel.BORDER_Y){
