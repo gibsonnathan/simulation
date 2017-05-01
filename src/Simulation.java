@@ -189,6 +189,9 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
      */
     private void update(){
         ObjectOutputStream out = null;
+        ObjectInputStream in = null;
+
+
 
         for(Ball b : balls){
             b.update();
@@ -286,21 +289,14 @@ class ClientPanel extends SimulationPanel implements Runnable{
         balls = null;
 
     }
-    /*
-        listener to respond to the timer
-     */
-    //public void actionPerformed(ActionEvent ev) {
-    //    if (ev.getSource() == timer) {
-    //        repaint();
-    //    }
-    //}
 
     public void paint(Graphics g) {
         g.drawRect(BORDER_X, BORDER_Y, BORDER_WIDTH, BORDER_HEIGHT);
-        for(Ball b : balls){
-            b.draw(g);
+        if (balls != null) {
+            for (Ball b : balls) {
+                b.draw(g);
+            }
         }
-
     }
 
     public void run(){
@@ -328,10 +324,13 @@ class ClientPanel extends SimulationPanel implements Runnable{
  */
 public class Simulation {
 
+    public static final int FRAME_HEIGHT = 700;
+    public static final int FRAME_WIDTH = 900;
+
     public static void main(String[] args) {
         final JFrame frame = new JFrame();
         final ServerPanel p = new ServerPanel();
-        frame.setSize(700, 700);
+        frame.setSize(FRAME_WIDTH, FRAME_HEIGHT);
         frame.setTitle("Physics Simulation");
 
 
@@ -341,13 +340,13 @@ public class Simulation {
         JButton stopButton = new JButton("Stop");
         JButton shootBallOne = new JButton("Shoot Ball 1");
         JButton shootBallTwo = new JButton("Shoot Ball 2");
+        JButton addBallButton = new JButton("Add a ball");
+        final JTextField massField = new JTextField("mass", 4);
 
 
         p.addBall(new Ball(200,200));
         p.addBall(new Ball(200,200));
-        p.addBall(new Ball(200,200));
-        p.addBall(new Ball(200,200));
-        p.addBall(new Ball(200,200));
+
 
         shootBallOne.addActionListener(new ActionListener() {
             @Override
@@ -367,13 +366,43 @@ public class Simulation {
         {
             public void actionPerformed(ActionEvent e) {
                 JFrame clientFrame = new JFrame();
+
+                JPanel buttonPanel = new JPanel();
+                JButton addBallButton = new JButton("Add a ball");
+                final JTextField massField = new JTextField("mass", 3);
+                buttonPanel.add(addBallButton);
+                buttonPanel.add(massField);
+
                 ClientPanel clientPanel = new ClientPanel();
+                clientFrame.add(buttonPanel, BorderLayout.NORTH);
                 clientFrame.add(clientPanel);
-                clientFrame.setSize(700, 700);
+                clientFrame.setSize(FRAME_WIDTH, FRAME_HEIGHT);
                 clientFrame.setTitle("Client");
-                clientFrame.setVisible(true);
+
+                addBallButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        try{
+                            Integer mass = Integer.parseInt(massField.getText());
+                            if(mass < 15 || mass > 30){
+                                throw new NumberFormatException();
+                            }
+                            try {
+                                Socket s = new Socket("127.0.0.1", 5003);
+                                ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+                                out.writeObject(mass);
+                            }catch(IOException x){
+                                x.printStackTrace();
+                            }
+                        }catch(NumberFormatException x){
+                            JOptionPane.showMessageDialog(frame, "Mass field should be an integer 15 <= x <= 30");
+                        }
+                    }
+                });
+
                 Thread clientThread = new Thread(clientPanel);
                 clientThread.start();
+                clientFrame.setVisible(true);
             }
         });
 
@@ -393,15 +422,31 @@ public class Simulation {
             }
         });
 
+        addBallButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try{
+                    int mass = Integer.parseInt(massField.getText());
+                    if(mass < 15 || mass > 30){
+                        throw new NumberFormatException();
+                    }
+                    p.addBall(new Ball(200, 200, 2, 2, mass));
+                }catch(NumberFormatException x){
+                    JOptionPane.showMessageDialog(frame, "Mass field should be an integer 15 <= x <= 30");
+                }
+            }
+        });
+
         buttonPanel.add(startServerButton);
         buttonPanel.add(startClientButton);
         buttonPanel.add(stopButton);
         buttonPanel.add(shootBallOne);
         buttonPanel.add(shootBallTwo);
+        buttonPanel.add(addBallButton);
+        buttonPanel.add(massField);
 
         frame.add(p);
         frame.add(buttonPanel, BorderLayout.NORTH);
-
 
         frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
