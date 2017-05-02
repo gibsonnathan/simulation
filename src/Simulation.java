@@ -14,10 +14,12 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.concurrent.*;
+import java.io.DataOutputStream;
+import java.io.DataInputStream;
 /*
     class that represents the state of a ball in this simulation
 
@@ -165,22 +167,24 @@ abstract class SimulationPanel extends JPanel{
     Panel that is displayed on the server
  */
 class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
-    private ArrayList<Ball> balls;
+    private CopyOnWriteArrayList<Ball> balls;
     javax.swing.Timer timer;
     Random r;
     ServerSocket serverSocket;
-    ArrayList<Socket> clients;
+    CopyOnWriteArrayList<Socket> clients;
+    boolean listening;
     /*
         sets up the ball objects in the simulation and created a timer that determines how frequently the
         simulation updates
      */
     public ServerPanel(){
-        balls = new ArrayList<Ball>();
+        balls = new CopyOnWriteArrayList<Ball>();
         timer=new Timer(DELAY, this);
         timer.start();
         r = new Random();
         serverSocket = null;
-        clients = new ArrayList<Socket>();
+        clients = new CopyOnWriteArrayList<Socket>();
+        listening = false;
     }
     /*
         adds a ball object to the simulation
@@ -194,7 +198,6 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
      */
     private void update(){
         ObjectOutputStream out = null;
-        ObjectInputStream in = null;
 
         //update each balls location
         for(Ball b : balls){
@@ -210,7 +213,6 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
                 e.printStackTrace();
             }
         }
-
         //check to see if there are collisions
         for(int i = 0; i < balls.size(); i++){
             for(int j = i + 1; j < balls.size(); j++){
@@ -275,6 +277,34 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
             }
         }
     }
+
+    public void listenForClientUpdates(){
+        if(!listening){
+            new Thread()
+            {
+                ObjectInputStream in = null;
+                public void run() {
+                    while(true){
+                        for(Socket s : clients){
+                            try {
+                                s.setSoTimeout(100);
+                                in = new ObjectInputStream(s.getInputStream());
+                                int mass = (int) in.readObject();
+                                System.out.println(mass);
+                                addBall(new Ball(200,200,2,2,mass));
+                            }catch(IOException e){
+
+                            }catch(ClassNotFoundException e){
+
+                            }
+                        }
+                    }
+                }
+
+            }.start();
+        }
+
+    }
 }
 /*
     panel that is used for displaying the simulation in the client
@@ -283,7 +313,7 @@ class ClientPanel extends SimulationPanel implements Runnable{
     Socket socket;
     ObjectOutputStream out;
     ObjectInputStream in;
-    ArrayList<Ball> balls;
+    CopyOnWriteArrayList<Ball> balls;
     /*
         ClientPanel constructor sets up networking
     */
@@ -305,6 +335,12 @@ class ClientPanel extends SimulationPanel implements Runnable{
         }
     }
     /*
+        returns the network socket used by the client
+    */
+    public Socket getSocket(){
+        return socket;
+    }
+    /*
         thread connects to the server and receives updates on each update containing
         a list of ball objects
     */
@@ -317,7 +353,7 @@ class ClientPanel extends SimulationPanel implements Runnable{
         while(true){
             try {
                 in = new ObjectInputStream(socket.getInputStream());
-                balls = (ArrayList<Ball>) in.readObject();
+                balls = (CopyOnWriteArrayList<Ball>) in.readObject();
                 repaint();
             }catch(ClassNotFoundException e){
                 e.printStackTrace();
@@ -334,6 +370,7 @@ public class Simulation {
     public static final int FRAME_HEIGHT = 700;
     public static final int FRAME_WIDTH = 900;
     public static final String SERVER_TITLE = "Simulation Server";
+    public static final String CLIENT_TITLE = "Simulation Client";
     public static final int MASS_FIELD_LENGTH = 3;
     public static final int MINIMUM_BALL_MASS = 20;
     public static final int MAXIMUM_BALL_MASS = 50;
@@ -389,6 +426,7 @@ public class Simulation {
         startClientButton.addActionListener(new ActionListener()
         {
             public void actionPerformed(ActionEvent e) {
+                //make a new frame that holds the client
                 final JFrame clientFrame = new JFrame();
                 final JPanel buttonPanel = new JPanel();
                 final JButton addBallButton = new JButton("Add a ball");
@@ -400,8 +438,7 @@ public class Simulation {
                 clientFrame.add(buttonPanel, BorderLayout.NORTH);
                 clientFrame.add(clientPanel);
                 clientFrame.setSize(FRAME_WIDTH, FRAME_HEIGHT);
-                clientFrame.setTitle("Client");
-
+                clientFrame.setTitle(CLIENT_TITLE);
                 /*
                     user clicked the add ball button on the client frame,
                     we have to get the desired mass from the massField text box
@@ -412,15 +449,17 @@ public class Simulation {
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         try{
-                            Integer mass = Integer.parseInt(massField.getText());
+                            int mass = Integer.parseInt(massField.getText());
                             if(mass < MINIMUM_BALL_MASS || mass > MAXIMUM_BALL_MASS){
                                 throw new NumberFormatException();
                             }
                             try {
-                                Socket s = new Socket(SERVER_IP_ADDRESS, SERVER_PORT);
-                                ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+                                ObjectOutputStream out = new ObjectOutputStream(clientPanel.getSocket().getOutputStream());
                                 out.writeObject(mass);
+                                p.listenForClientUpdates();
                             }catch(IOException x){
+                                x.printStackTrace();
+                            }catch(NullPointerException x){
                                 x.printStackTrace();
                             }
                         }catch(NumberFormatException x){
