@@ -162,6 +162,7 @@ abstract class SimulationPanel extends JPanel{
     public static final int BORDER_X = 100;
     public static final int BORDER_Y = 100;
     public static final int DELAY = 10;
+    public static final int SOCKET_TIMEOUT = 300;
 }
 /*
     Panel that is displayed on the server
@@ -267,7 +268,9 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
         }catch (IOException e){
             e.printStackTrace();
         }
-
+        /*
+            as long as the program runs accpept connections
+        */
         while (true) {
             try {
                 Socket clientSocket = serverSocket.accept();
@@ -277,7 +280,10 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
             }
         }
     }
-
+    /*
+        starts a thread that is responsible for listening for clients to add
+        balls to the simulation
+    */
     public void listenForClientUpdates(){
         if(!listening){
             new Thread()
@@ -287,15 +293,15 @@ class ServerPanel extends SimulationPanel implements ActionListener, Runnable{
                     while(true){
                         for(Socket s : clients){
                             try {
-                                s.setSoTimeout(100);
+                                s.setSoTimeout(SOCKET_TIMEOUT);
                                 in = new ObjectInputStream(s.getInputStream());
                                 int mass = (int) in.readObject();
-                                System.out.println(mass);
-                                addBall(new Ball(200,200,2,2,mass));
+                                addBall(new Ball(Simulation.BALL_BEGIN_X, Simulation.BALL_BEGIN_Y, Simulation.BALL_BEGIN_VX, Simulation.BALL_BEGIN_VY, mass));
                             }catch(IOException e){
-
+                                //don't print this trace as it is very frequent (making it hard to find other logs)
+                                //and is only notifying that the socket timed out
                             }catch(ClassNotFoundException e){
-
+                                e.printStackTrace();
                             }
                         }
                     }
@@ -372,12 +378,16 @@ public class Simulation {
     public static final String SERVER_TITLE = "Simulation Server";
     public static final String CLIENT_TITLE = "Simulation Client";
     public static final int MASS_FIELD_LENGTH = 3;
-    public static final int MINIMUM_BALL_MASS = 20;
-    public static final int MAXIMUM_BALL_MASS = 50;
+    public static final int MINIMUM_BALL_MASS = 15;
+    public static final int MAXIMUM_BALL_MASS = 30;
     public static final int MIN_INITIAL_SPEED = -5;
     public static final int MAX_INITIAL_SPEED = 5;
     public static final String SERVER_IP_ADDRESS = "127.0.0.1";
     public static final int SERVER_PORT = 2345;
+    public static final int BALL_BEGIN_X = 200;
+    public static final int BALL_BEGIN_Y = 200;
+    public static final int BALL_BEGIN_VX = 2;
+    public static final int BALL_BEGIN_VY = 2;
 
     public static void main(String[] args) {
         final JFrame frame = new JFrame();
@@ -399,8 +409,8 @@ public class Simulation {
         startClientButton.setEnabled(false);
 
         //add initial balls to the simulation
-        p.addBall(new Ball(200,200));
-        p.addBall(new Ball(200,200));
+        p.addBall(new Ball(BALL_BEGIN_X, BALL_BEGIN_Y));
+        p.addBall(new Ball(BALL_BEGIN_X, BALL_BEGIN_Y));
 
         /*
             user clicks the shoot ball 1 button
@@ -507,7 +517,7 @@ public class Simulation {
                     if(mass < MINIMUM_BALL_MASS || mass > MAXIMUM_BALL_MASS){
                         throw new NumberFormatException();
                     }
-                    p.addBall(new Ball(200, 200, 2, 2, mass));
+                    p.addBall(new Ball(BALL_BEGIN_X, BALL_BEGIN_Y, BALL_BEGIN_VX, BALL_BEGIN_VY, mass));
                 }catch(NumberFormatException x){
                     JOptionPane.showMessageDialog(frame, "Mass field should be an integer " + MINIMUM_BALL_MASS + " <= x <= " + MAXIMUM_BALL_MASS);
                 }
